@@ -9,13 +9,14 @@ e.g.
 */
 #define DSHOT_PORT PORTD
 
-DShot esc1(DShot::Mode::DSHOT600);
+DShot esc1(DShot::Mode::DSHOT300);
 
 uint16_t throttle = 0;
 uint16_t target = 0;
 
 void setup() {
   Serial.begin(115200);
+  pinMode(A0, INPUT);
 
   // Notice, all pins must be connected to same PORT
   esc1.attach(7);  
@@ -23,6 +24,7 @@ void setup() {
 }
 
 void loop() {
+  /*
   if (Serial.available()>0){
     target = Serial.parseInt();
     if (target>2047)
@@ -30,6 +32,10 @@ void loop() {
     Serial.print(target, HEX);
     Serial.print("\t");
   }
+  */
+  target = analogRead(A0);
+  if (target>2047)
+    target = 2047;
   if (throttle<48){
     throttle = 48;
   }
@@ -37,10 +43,10 @@ void loop() {
     esc1.setThrottle(target);
   }else{
     if (target>throttle){
-      throttle ++;
+      throttle += 5;
       esc1.setThrottle(throttle);
     }else if (target<throttle){
-      throttle --;
+      throttle -= 5;
       esc1.setThrottle(throttle);
     }
   }
