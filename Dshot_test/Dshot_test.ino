@@ -8,22 +8,21 @@ Leonardo: PORTB, available pins 4-7 (D8-D11)
 e.g.
 */
 #define DSHOT_PORT PORTD
-DShot esc1(DShot::Mode::DSHOT300);
+
+DShot esc1(DShot::Mode::DSHOT600);
 
 uint16_t throttle = 0;
-uint16_t target = 50;
+uint16_t target = 0;
 
 void setup() {
-  //Serial.begin(115200);
+  Serial.begin(115200);
 
   // Notice, all pins must be connected to same PORT
-  esc1.attach(3);  
-  esc1.setThrottle(0);
-  //delay(10000);
+  esc1.attach(7);  
+  esc1.setThrottle(throttle);
 }
 
 void loop() {
-  /*
   if (Serial.available()>0){
     target = Serial.parseInt();
     if (target>2047)
@@ -45,9 +44,5 @@ void loop() {
       esc1.setThrottle(throttle);
     }
   }
-  delay(100);
-  */
-  throttle ++;
-  esc1.setThrottle(throttle);
-  delay(50);
+  delay(10);
 }
