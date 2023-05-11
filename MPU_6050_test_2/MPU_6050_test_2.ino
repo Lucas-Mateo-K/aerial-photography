@@ -14,10 +14,7 @@ void  loop(){
   Wire.beginTransmission(MPU);
   Wire.write(0x3B);  
   Wire.endTransmission(false);
-  Wire.requestFrom(MPU,12,true);  
-  AcX=Wire.read()<<8|Wire.read();    
-  AcY=Wire.read()<<8|Wire.read();  
-  AcZ=Wire.read()<<8|Wire.read();  
+  Wire.requestFrom(MPU,6,true);  
   GyX=Wire.read()<<8|Wire.read();  
   GyY=Wire.read()<<8|Wire.read();  
   GyZ=Wire.read()<<8|Wire.read();  
