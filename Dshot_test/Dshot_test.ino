@@ -7,7 +7,7 @@ UNO: PORTD, available pins 0-7 (D0-D7)
 Leonardo: PORTB, available pins 4-7 (D8-D11)
 e.g.
 */
-#define DSHOT_PORT PORTD
+//#define DSHOT_PORT PORTD
 
 DShot esc1(DShot::Mode::DSHOT300);
 
@@ -16,7 +16,7 @@ uint16_t target = 0;
 
 void setup() {
   Serial.begin(115200);
-  pinMode(A0, INPUT);
+  pinMode(A7, INPUT);
 
   // Notice, all pins must be connected to same PORT
   esc1.attach(7);  
@@ -33,7 +33,7 @@ void loop() {
     Serial.print("\t");
   }
   */
-  target = analogRead(A0);
+  target = analogRead(A7);
   if (target>2047)
     target = 2047;
   if (throttle<48){
@@ -41,13 +41,16 @@ void loop() {
   }
   if (target<=48){
     esc1.setThrottle(target);
+    Serial.println(target);
   }else{
     if (target>throttle){
       throttle += 5;
       esc1.setThrottle(throttle);
+      Serial.println(throttle);
     }else if (target<throttle){
       throttle -= 5;
       esc1.setThrottle(throttle);
+      Serial.println(throttle);
     }
   }
   delay(10);
