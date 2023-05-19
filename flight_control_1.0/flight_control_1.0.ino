@@ -4,8 +4,8 @@
 #define MPU 0x68
 #define accScale 3 // 0 to 3
 #define gyrScale 3 // 0 to 3
-#define calibrationSamples 500
-#define gyrCorrection 0.1 
+#define calibrationSamples 2000
+#define gyrCorrection 0.5 
 
 uint8_t ACCEL_FS_SEL;
 uint8_t GYRO_FS_SEL;
@@ -162,6 +162,7 @@ void loop() {
   gyrAngle();
   filterMPU();
 
+/*
   Serial.print("Cx:");
   Serial.println(CxAngle);
   Serial.print("Cy:");
@@ -173,6 +174,12 @@ void loop() {
   Serial.print("Gx:");
   Serial.println(GxAngle);
   Serial.print("Gy:");
+  Serial.println(GyAngle);
+*/
+
+  Serial.print("1:");
+  Serial.println(GxAngle);
+  Serial.print("2:");
   Serial.println(GyAngle);
 
   pidRoll.Compute();
@@ -202,6 +209,7 @@ void readMPU(){
   Ax = Ax/accScaleValue;
   Ay = Ay/accScaleValue;
   Az = Az/accScaleValue;
+  AzNoCorrect = Az;
 
   if(accCal == true){
     Ax -= AxErr;
