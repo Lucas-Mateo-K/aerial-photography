@@ -1,9 +1,3 @@
-#include <IRremote.h>
-
-const int RECV_PIN = A3;
-IRrecv irrecv(RECV_PIN);
-decode_results results;
-
 #include "DShot.h"
 
 /*
@@ -30,9 +24,7 @@ uint16_t target = 0;
 
 void setup() {
   Serial.begin(115200);
-
-  irrecv.enableIRIn();
-  irrecv.blink13(true);
+  pinMode(A0, INPUT);
 
   // Notice, all pins must be connected to same PORT
   esc.attach(M1);
@@ -61,17 +53,17 @@ void setup() {
     } else {
       if (target > throttle) {
         throttle++;
-        esc.setThrottle(M1, throttle, 0);
-        esc.setThrottle(M2, throttle, 0);
-        esc.setThrottle(M3, throttle, 0);
-        esc.setThrottle(M4, throttle, 0);
+        esc.setThrottle(M1, target, 0);
+        esc.setThrottle(M2, target, 0);
+        esc.setThrottle(M3, target, 0);
+        esc.setThrottle(M4, target, 0);
         
       } else if (target < throttle) {
         throttle--;
-        esc.setThrottle(M1, throttle, 0);
-        esc.setThrottle(M2, throttle, 0);
-        esc.setThrottle(M3, throttle, 0);
-        esc.setThrottle(M4, throttle, 0);
+        esc.setThrottle(M1, target, 0);
+        esc.setThrottle(M2, target, 0);
+        esc.setThrottle(M3, target, 0);
+        esc.setThrottle(M4, target, 0);
         
       }
     }
@@ -79,5 +71,33 @@ void setup() {
 }
 
 void loop() {
+
+  target = analogRead(A0);
+  if (target>2047)
+    target = 2047;
+  if (throttle<48){
+    throttle = 48;
+  }
+  if (target<=48){
+        esc.setThrottle(M1, target, 0);
+        esc.setThrottle(M2, target, 0);
+        esc.setThrottle(M3, target, 0);
+        esc.setThrottle(M4, target, 0);
+  }else{
+    if (target>throttle){
+      throttle += 5;
+        esc.setThrottle(M1, throttle, 0);
+        esc.setThrottle(M2, throttle, 0);
+        esc.setThrottle(M3, throttle, 0);
+        esc.setThrottle(M4, throttle, 0);
+    }else if (target<throttle){
+      throttle -= 5;
+        esc.setThrottle(M1, throttle, 0);
+        esc.setThrottle(M2, throttle, 0);
+        esc.setThrottle(M3, throttle, 0);
+        esc.setThrottle(M4, throttle, 0);
+    }
+  }
+  delay(10);
 
 }

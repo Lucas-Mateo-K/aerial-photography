@@ -16,7 +16,7 @@ uint16_t target = 0;
 
 void setup() {
   Serial.begin(115200);
-  pinMode(A7, INPUT);
+  pinMode(A0, INPUT);
 
   // Notice, all pins must be connected to same PORT
   esc1.attach(7);  
@@ -33,7 +33,7 @@ void loop() {
     Serial.print("\t");
   }
   */
-  target = analogRead(A7);
+  target = analogRead(A0);
   if (target>2047)
     target = 2047;
   if (throttle<48){

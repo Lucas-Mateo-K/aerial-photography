@@ -3,8 +3,9 @@
 
 #define MPU 0x68
 #define accScale 3 // 0 to 3
-#define gyrScale 0 // 0 to 3
+#define gyrScale 3 // 0 to 3
 #define calibrationSamples 500
+#define gyrCorrection 0.1 
 
 uint8_t ACCEL_FS_SEL;
 uint8_t GYRO_FS_SEL;
@@ -15,6 +16,7 @@ float gyrScaleValue;
 float Ax;
 float Ay;
 float Az;
+float AzNoCorrect;
 
 float Gx;
 float Gy;
@@ -38,6 +40,11 @@ float GzAngle;
 float CxAngle;
 float CyAngle;
 float CzAngle;
+
+bool accCal = false;
+bool gyrCal = false;
+
+float elapsedTime, currentTime, previousTime;
 
 float accTotal;
 
@@ -128,6 +135,12 @@ void setup() {
   Wire.write(0x1B);  
   Wire.write(GYRO_FS_SEL);    
   Wire.endTransmission(true);
+    // Configure low pass filter
+    // Set Digital Low Pass Filter about ~43Hz
+  //Wire.beginTransmission(MPU);
+  //Wire.write(0x1A);
+  //Wire.write(0x03);
+  //Wire.endTransmission();
 
   rollSET = 0;
   pitchSET = 0;
@@ -138,20 +151,33 @@ void setup() {
   pidAlt.SetMode(AUTOMATIC);
 
   accCalibration();
+  gyrCalibration();
+
+  previousTime = millis();
 }
 
 void loop() {
+  readMPU();
+  accAngle();
+  gyrAngle();
+  filterMPU();
+
+  Serial.print("Cx:");
+  Serial.println(CxAngle);
+  Serial.print("Cy:");
+  Serial.println(CyAngle);
+  Serial.print("Ax:");
+  Serial.println(AxAngle);
+  Serial.print("Ay:");
+  Serial.println(AyAngle);
+  Serial.print("Gx:");
+  Serial.println(GxAngle);
+  Serial.print("Gy:");
+  Serial.println(GyAngle);
+
   pidRoll.Compute();
   pidPitch.Compute();
   pidAlt.Compute();
-  readMPU();
-  accAngle();
-  Serial.print("Variable_1:");
-  Serial.println(Ax);
-  Serial.print("Variable_2:");
-  Serial.println(AxErr);
-  //Serial.print("Variable_4:");
-  //Serial.println(Az);
   delay(100);
 }
 
@@ -176,24 +202,18 @@ void readMPU(){
   Ax = Ax/accScaleValue;
   Ay = Ay/accScaleValue;
   Az = Az/accScaleValue;
-}
 
-void filterMPU(){
-
-}
-
-void accAngle(){
-  accTotal = sqrt(pow(Ax, 2) + pow(Ay, 2) + pow(Az, 2));
-  if (abs(Ay) < accTotal) {
-      AyAngle = asin((float)Ay / accTotal) * (180 / PI);
+  if(accCal == true){
+    Ax -= AxErr;
+    Ay -= AyErr;
+    Az -= AzErr;
   }
-  if (abs(Ax) < accTotal) {
-      AxAngle = asin((float)Ax / accTotal) * (180 / PI);
+
+  if(gyrCal == true){
+    Gx -= GxErr;
+    Gy -= GyErr;
+    Gz -= GzErr;
   }
-}
-
-void gyrAngle(){
-
 }
 
 void accCalibration(){
@@ -212,8 +232,46 @@ void accCalibration(){
   AyErr = AyErr/calibrationSamples;
   AzErr = AzErr/calibrationSamples;
   
+  accCal = true;
 }
 
 void gyrCalibration(){
-  
+  int i = 0;
+  GxErr = 0;
+  GyErr = 0;
+  GzErr = 0;
+  while(i < calibrationSamples){
+    readMPU();
+    GxErr = GxErr + Gx;
+    GyErr = GyErr + Gy;
+    GzErr = GzErr + Gz;
+    i ++;
+  }
+  GxErr = GxErr/calibrationSamples;
+  GyErr = GyErr/calibrationSamples;
+  GzErr = GzErr/calibrationSamples;
+  gyrCal = true;
+}
+
+void accAngle(){
+  accTotal = sqrt(pow(Ax, 2) + pow(Ay, 2) + pow(AzNoCorrect, 2));
+  if (abs(Ax) < accTotal) {
+      AxAngle = asin((float)Ax / accTotal) * (180 / PI);
+  }
+  if (abs(Ay) < accTotal) {
+      AyAngle = asin((float)Ay / accTotal) * (180 / PI);
+  }
+}
+
+void gyrAngle(){
+  previousTime = currentTime;
+  currentTime = millis();
+  elapsedTime = (currentTime - previousTime) / 1000;
+  GxAngle = GxAngle + Gx * elapsedTime;
+  GyAngle = GyAngle + Gy * elapsedTime;
+}
+
+void filterMPU(){
+  CxAngle = (GxAngle * (1-gyrCorrection)) + (AxAngle * gyrCorrection);
+  CyAngle = (GyAngle * (1-gyrCorrection)) + (AyAngle * gyrCorrection);
 }
