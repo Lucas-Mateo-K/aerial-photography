@@ -4,8 +4,8 @@
 #define MPU 0x68
 #define accScale 3 // 0 to 3
 #define gyrScale 3 // 0 to 3
-#define calibrationSamples 2000
-#define gyrCorrection 0.5 
+#define calibrationSamples 500
+#define gyrCorrection 0.08
 
 uint8_t ACCEL_FS_SEL;
 uint8_t GYRO_FS_SEL;
@@ -44,9 +44,14 @@ float CzAngle;
 bool accCal = false;
 bool gyrCal = false;
 
-float elapsedTime, currentTime, previousTime;
+float elapsedTime;
+float currentTime; 
+float previousTime;
 
 float accTotal;
+
+float AxIIR;
+float AyIIR;
 
 double rollERR;
 double pitchERR;
@@ -177,15 +182,15 @@ void loop() {
   Serial.println(GyAngle);
 */
 
-  Serial.print("1:");
+  Serial.print("Gx:");
   Serial.println(GxAngle);
-  Serial.print("2:");
+  Serial.print("Gy:");
   Serial.println(GyAngle);
 
   pidRoll.Compute();
   pidPitch.Compute();
   pidAlt.Compute();
-  delay(100);
+  delay(50);
 }
 
 void readMPU(){
@@ -263,11 +268,11 @@ void gyrCalibration(){
 
 void accAngle(){
   accTotal = sqrt(pow(Ax, 2) + pow(Ay, 2) + pow(AzNoCorrect, 2));
-  if (abs(Ax) < accTotal) {
-      AxAngle = asin((float)Ax / accTotal) * (180 / PI);
-  }
   if (abs(Ay) < accTotal) {
-      AyAngle = asin((float)Ay / accTotal) * (180 / PI);
+    AxAngle = asin((float)Ay / accTotal) * (180 / PI);
+  }
+  if (abs(Ax) < accTotal) {
+    AyAngle = asin((float)Ax / accTotal) * (180 / PI);
   }
 }
 
@@ -280,6 +285,8 @@ void gyrAngle(){
 }
 
 void filterMPU(){
-  CxAngle = (GxAngle * (1-gyrCorrection)) + (AxAngle * gyrCorrection);
-  CyAngle = (GyAngle * (1-gyrCorrection)) + (AyAngle * gyrCorrection);
+  AxIIR = AxIIR * (1-gyrCorrection) + (AxAngle - GxAngle) * gyrCorrection;
+  AyIIR = AyIIR * (1-gyrCorrection) + (AyAngle - GyAngle) * gyrCorrection;
+  GxAngle += AxIIR;
+  GyAngle += AyIIR;
 }
