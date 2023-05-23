@@ -33,7 +33,7 @@
 volatile byte previous_state[4];
 
 // Duration of the pulse on each channel of the receiver in µs (must be within 1000µs & 2000µs)
-volatile unsigned int pulse_length[4] = {1000, 1000, 1000, 1200};
+volatile unsigned int pulse_length[4] = {1500, 1500, 1000, 1500};
 
 // Used to calculate pulse duration on each channel
 volatile unsigned long current_time;
@@ -115,6 +115,7 @@ int battery_voltage;
  * Setup configuration
  */
 void setup() {
+    Serial.begin(115200);
     // Start I2C communication
     Wire.begin();
     TWBR = 12; // Set the I2C clock speed to 400kHz.
@@ -253,6 +254,8 @@ void calculateAngles() {
     angular_motions[ROLL]  = 0.7 * angular_motions[ROLL]  + 0.3 * gyro_raw[X] / SSF_GYRO;
     angular_motions[PITCH] = 0.7 * angular_motions[PITCH] + 0.3 * gyro_raw[Y] / SSF_GYRO;
     angular_motions[YAW]   = 0.7 * angular_motions[YAW]   + 0.3 * gyro_raw[Z] / SSF_GYRO;
+
+    Serial.println(measures[ROLL]);
 }
 
 /**

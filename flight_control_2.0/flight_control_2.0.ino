@@ -1,31 +1,40 @@
 #include <Wire.h>
 #include "DShot.h"
-#include <PID_v1.h>
+
+// pid values for pitch and roll
+//8, 0, 22
+
+#define p 20
+#define i 0.05
+#define d 60
 
 #define MPU 0x68
 
-#define accScale 3 // 0 to 3
-#define gyrScale 3 // 0 to 3
+#define accScale 2 // 0 to 3
+#define gyrScale 2 // 0 to 3
 
-#define calibrationSamples 500
+#define calibrationSamples 200
 
-#define gyrCorrection 0.08
+#define gyrCorrection 0.006
+#define filter 0.8
 
-#define M1 7
-#define M2 6
-#define M3 5
-#define M4 3
+#define M1 3
+#define M2 5
+#define M3 6
+#define M4 7
 
 DShot esc(DShot::Mode::DSHOT300);
 
+uint16_t throttle = 0;
 uint16_t throttle1 = 0;
-uint16_t target1 = 0;
 uint16_t throttle2 = 0;
-uint16_t target2 = 0;
 uint16_t throttle3 = 0;
-uint16_t target3 = 0;
 uint16_t throttle4 = 0;
-uint16_t target4 = 0;
+
+double roll;
+double pitch;
+
+bool getPitch = false;
 
 uint8_t ACCEL_FS_SEL;
 uint8_t GYRO_FS_SEL;
@@ -37,6 +46,7 @@ float Ax;
 float Ay;
 float Az;
 float AzNoCorrect;
+float accTotal;
 
 float Gx;
 float Gy;
@@ -68,10 +78,18 @@ float elapsedTime;
 float currentTime; 
 float previousTime;
 
-float accTotal;
-
 float xIIR;
 float yIIR;
+
+#define pidRoll 0
+#define pidPitch 1
+#define pidAlt 2
+#define constrainPid 500
+#define constrainIntegral 600
+
+double previousError[3];
+double integral[3];
+double derivative[3];
 
 double rollERR;
 double pitchERR;
@@ -85,31 +103,24 @@ double rollSET;
 double pitchSET;
 double altSET;
 
-double KpRoll;
-double KiRoll;
-double KdRoll;
+double KpRoll = p;
+double KiRoll = i;
+double KdRoll = d;
 
-double KpPitch;
-double KiPitch;
-double KdPitch;
+double KpPitch = p;
+double KiPitch = i;
+double KdPitch = d;
 
 double KpAlt;
 double KiAlt;
 double KdAlt;
 
-int motor1;
-int motor2;
-int motor3;
-int motor4;
-
-PID pidRoll(&rollERR, &rollCON, &rollSET, KpRoll, KiRoll, KdRoll, DIRECT);
-PID pidPitch(&pitchERR, &pitchCON, &pitchSET, KpPitch, KiPitch, KdPitch, DIRECT);
-PID pidAlt(&altERR, &altCON, &altSET, KpAlt, KiAlt, KdAlt, DIRECT);
-
 void setup() {
   Serial.begin(115200);
 
+  pinMode(8, INPUT);
   pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
 
   switch(accScale){
     case 1:
@@ -162,8 +173,8 @@ void setup() {
   Wire.write(0x1B);  
   Wire.write(GYRO_FS_SEL);    
   Wire.endTransmission(true);
-    // Configure low pass filter
-    // Set Digital Low Pass Filter about ~43Hz
+  //Configure low pass filter
+  //Set Digital Low Pass Filter about ~43Hz
   //Wire.beginTransmission(MPU);
   //Wire.write(0x1A);
   //Wire.write(0x03);
@@ -172,10 +183,6 @@ void setup() {
   rollSET = 0;
   pitchSET = 0;
   altSET = 0;
-
-  pidRoll.SetMode(AUTOMATIC);
-  pidPitch.SetMode(AUTOMATIC);
-  pidAlt.SetMode(AUTOMATIC);
 
   accCalibration();
   gyrCalibration();
@@ -190,37 +197,11 @@ void setup() {
   esc.setThrottle(M4, throttle4, 0);
   delay(700);
 
-  target1 = 100;
-
-  while(throttle1 < 100){
-    if (throttle1 < 48) {  // special commands disabled
-    throttle1 = 48;
-    }
-    if (target1 <= 48) {
-      esc.setThrottle(M1, target1, 0);
-      esc.setThrottle(M2, target1, 0);
-      esc.setThrottle(M3, target1, 0);
-      esc.setThrottle(M4, target1, 0);
-      
-      if (target1 == 0) throttle1 = 48;
-    } else {
-      if (target1 > throttle1) {
-        throttle1++;
-        esc.setThrottle(M1, target1, 0);
-        esc.setThrottle(M2, target1, 0);
-        esc.setThrottle(M3, target1, 0);
-        esc.setThrottle(M4, target1, 0);
-        
-      } else if (target1 < throttle1) {
-        throttle1--;
-        esc.setThrottle(M1, target1, 0);
-        esc.setThrottle(M2, target1, 0);
-        esc.setThrottle(M3, target1, 0);
-        esc.setThrottle(M4, target1, 0);
-        
-      }
-    }
-  }
+  esc.setThrottle(M1, 100, 0);
+  esc.setThrottle(M2, 100, 0);
+  esc.setThrottle(M3, 100, 0);
+  esc.setThrottle(M4, 100, 0);
+  delay(1000);
 
   previousTime = millis();
 }
@@ -231,43 +212,103 @@ void loop() {
   gyrAngle();
   filterMPU();
 
-  Serial.print("Cx:");
-  Serial.println(CxAngle);
-  Serial.print("Cy:");
-  Serial.println(CyAngle);
-
-  pidRoll.Compute();
-  pidPitch.Compute();
-  pidAlt.Compute();
-
-  target = analogRead(A0);
-  if (target>2047)
-    target = 2047;
-  if (throttle<48){
-    throttle = 48;
-  }
-  if (target<=48){
-        esc.setThrottle(M1, target, 0);
-        esc.setThrottle(M2, target, 0);
-        esc.setThrottle(M3, target, 0);
-        esc.setThrottle(M4, target, 0);
-  }else{
-    if (target>throttle){
-      throttle += 5;
-        esc.setThrottle(M1, throttle, 0);
-        esc.setThrottle(M2, throttle, 0);
-        esc.setThrottle(M3, throttle, 0);
-        esc.setThrottle(M4, throttle, 0);
-    }else if (target<throttle){
-      throttle -= 5;
-        esc.setThrottle(M1, throttle, 0);
-        esc.setThrottle(M2, throttle, 0);
-        esc.setThrottle(M3, throttle, 0);
-        esc.setThrottle(M4, throttle, 0);
+/*
+  if(Serial.available() > 0){
+    int g = KdRoll;
+    KdRoll = Serial.parseInt();
+    if(KdRoll <= 0){
+      KdRoll = g;
     }
   }
+*/
 
-  delay(5);
+  noInterrupts();
+  throttle = pulseIn(8, HIGH);
+  interrupts();
+  throttle = min(1842, throttle);
+  throttle = max(1117, throttle);
+  throttle = map(throttle, 1117, 1842, 0, 2047);
+
+/*
+  if(getPitch == false){
+  noInterrupts();
+  roll = pulseIn(A0, HIGH);
+  interrupts();
+  roll = constrain(roll, 1117, 1842);
+  roll = map(roll, 1117, 1842, -10, 10);
+  getPitch = true;
+  }
+
+  else{
+  noInterrupts();
+  pitch = pulseIn(A1, HIGH);
+  interrupts();
+  pitch = constrain(pitch, 1117, 1842);
+  pitch = map(pitch, 1117, 1842, -10, 10);
+  getPitch = false;
+  }
+
+  Serial.print("roll:");
+  Serial.println(roll);
+  */
+
+  if(throttle > 50){
+    PID(pidRoll, rollERR, &rollCON, rollSET  - roll, KpRoll, KiRoll, KdRoll);
+    PID(pidPitch, pitchERR, &pitchCON, pitchSET + pitch, KpPitch, KiPitch, KdPitch);
+  }
+
+  throttle1 = max(0, throttle - (-rollCON) + (pitchCON));
+  throttle2 = max(0, throttle - (-rollCON) - (pitchCON));
+  throttle3 = max(0, throttle + (-rollCON) + (pitchCON));
+  throttle4 = max(0, throttle + (-rollCON) - (pitchCON));
+
+  if(throttle < 50){
+    throttle1 = 0;
+    throttle2 = 0;
+    throttle3 = 0;
+    throttle4 = 0;
+    integral[0] = 0;
+    integral[1] = 0;
+    integral[2] = 0;
+  }
+
+  //Serial.print("motor1:");
+  //Serial.println(throttle1);
+  //Serial.print("motor2:");
+  //Serial.println(throttle2);
+  //Serial.print("motor3:");
+  //Serial.println(throttle3);
+  //Serial.print("motor4:");
+  //Serial.println(throttle4);
+
+  Serial.print("rollERR:");
+  Serial.println(rollERR);
+  //Serial.print("pitchERR:");
+  //Serial.println(pitchERR);
+  Serial.print("rollCON:");
+  Serial.println(rollCON);
+  //Serial.print("pitchCON:");
+  //Serial.println(pitchCON);
+  //Serial.print("AyAngle:");
+  //Serial.println(AyAngle);
+  //Serial.print("GyAngle:");
+  //Serial.println(GyAngle);
+
+  esc.setThrottle(M1, throttle1, 0);
+  esc.setThrottle(M2, throttle2, 0);
+  esc.setThrottle(M3, throttle3, 0);
+  esc.setThrottle(M4, throttle4, 0);
+
+}
+
+void PID(int pidSelect, double ERR, double *CON, double SET, double Kp, double Ki, double Kd){
+  double error = ERR - SET;
+  integral[pidSelect] += error;
+  integral[pidSelect] = constrain(integral[pidSelect], (-1 * constrainIntegral), constrainIntegral);
+  derivative[pidSelect] = error - previousError[pidSelect];
+  previousError[pidSelect] = error;
+  *CON = -1 * ((Kp * error) + (Ki * integral[pidSelect]) + (Kd * derivative[pidSelect]));
+  *CON = constrain(*CON, (-1 * constrainPid), constrainPid);
 }
 
 void readMPU(){
@@ -307,16 +348,16 @@ void readMPU(){
 }
 
 void accCalibration(){
-  int i = 0;
+  int count = 0;
   AxErr = 0;
   AyErr = 0;
   AzErr = 0;
-  while(i < calibrationSamples){
+  while(count < calibrationSamples){
     readMPU();
     AxErr = AxErr + Ax;
     AyErr = AyErr + Ay;
     AzErr = AzErr + Az;
-    i ++;
+    count ++;
   }
   AxErr = AxErr/calibrationSamples;
   AyErr = AyErr/calibrationSamples;
@@ -326,16 +367,16 @@ void accCalibration(){
 }
 
 void gyrCalibration(){
-  int i = 0;
+  int count = 0;
   GxErr = 0;
   GyErr = 0;
   GzErr = 0;
-  while(i < calibrationSamples){
+  while(count < calibrationSamples){
     readMPU();
     GxErr = GxErr + Gx;
     GyErr = GyErr + Gy;
     GzErr = GzErr + Gz;
-    i ++;
+    count ++;
   }
   GxErr = GxErr/calibrationSamples;
   GyErr = GyErr/calibrationSamples;
@@ -349,7 +390,7 @@ void accAngle(){
     AxAngle = asin((float)Ay / accTotal) * (180 / PI);
   }
   if (abs(Ax) < accTotal) {
-    AyAngle = asin((float)Ax / accTotal) * (180 / PI);
+    AyAngle = -1 * (asin((float)Ax / accTotal) * (180 / PI));
   }
 }
 
@@ -368,4 +409,6 @@ void filterMPU(){
   CyAngle = GyAngle;
   CxAngle += xIIR;
   CyAngle += yIIR;
+  rollERR = rollERR * (1-filter) + (CxAngle) * filter;
+  pitchERR = pitchERR * (1-filter) + (CyAngle) * filter;
 }

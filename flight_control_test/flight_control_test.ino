@@ -1,5 +1,5 @@
 #include <Wire.h>
-#include "DShot.h"
+
 #include <PID_v1.h>
 
 #define MPU 0x68
@@ -11,21 +11,10 @@
 
 #define gyrCorrection 0.08
 
-#define M1 7
-#define M2 6
-#define M3 5
-#define M4 3
-
-DShot esc(DShot::Mode::DSHOT300);
-
-uint16_t throttle1 = 0;
-uint16_t target1 = 0;
-uint16_t throttle2 = 0;
-uint16_t target2 = 0;
-uint16_t throttle3 = 0;
-uint16_t target3 = 0;
-uint16_t throttle4 = 0;
-uint16_t target4 = 0;
+// pid values for pitch and roll
+#define p 0.01
+#define i 0.01
+#define d 0.01
 
 uint8_t ACCEL_FS_SEL;
 uint8_t GYRO_FS_SEL;
@@ -85,13 +74,13 @@ double rollSET;
 double pitchSET;
 double altSET;
 
-double KpRoll;
-double KiRoll;
-double KdRoll;
+double KpRoll = p;
+double KiRoll = i;
+double KdRoll = d;
 
-double KpPitch;
-double KiPitch;
-double KdPitch;
+double KpPitch = p;
+double KiPitch = i;
+double KdPitch = d;
 
 double KpAlt;
 double KiAlt;
@@ -173,6 +162,12 @@ void setup() {
   pitchSET = 0;
   altSET = 0;
 
+  pidRoll.SetOutputLimits(-300, 300);
+  pidPitch.SetOutputLimits(-300, 300);
+  pidAlt.SetOutputLimits(-300, 300);
+
+  pidRoll.SetSampleTime(1);
+
   pidRoll.SetMode(AUTOMATIC);
   pidPitch.SetMode(AUTOMATIC);
   pidAlt.SetMode(AUTOMATIC);
@@ -180,47 +175,6 @@ void setup() {
   accCalibration();
   gyrCalibration();
 
-  esc.attach(M1);
-  esc.setThrottle(M1, throttle1, 0);
-  esc.attach(M2);
-  esc.setThrottle(M2, throttle2, 0);
-  esc.attach(M3);
-  esc.setThrottle(M3, throttle3, 0);
-  esc.attach(M4);
-  esc.setThrottle(M4, throttle4, 0);
-  delay(700);
-
-  target1 = 100;
-
-  while(throttle1 < 100){
-    if (throttle1 < 48) {  // special commands disabled
-    throttle1 = 48;
-    }
-    if (target1 <= 48) {
-      esc.setThrottle(M1, target1, 0);
-      esc.setThrottle(M2, target1, 0);
-      esc.setThrottle(M3, target1, 0);
-      esc.setThrottle(M4, target1, 0);
-      
-      if (target1 == 0) throttle1 = 48;
-    } else {
-      if (target1 > throttle1) {
-        throttle1++;
-        esc.setThrottle(M1, target1, 0);
-        esc.setThrottle(M2, target1, 0);
-        esc.setThrottle(M3, target1, 0);
-        esc.setThrottle(M4, target1, 0);
-        
-      } else if (target1 < throttle1) {
-        throttle1--;
-        esc.setThrottle(M1, target1, 0);
-        esc.setThrottle(M2, target1, 0);
-        esc.setThrottle(M3, target1, 0);
-        esc.setThrottle(M4, target1, 0);
-        
-      }
-    }
-  }
 
   previousTime = millis();
 }
@@ -231,43 +185,33 @@ void loop() {
   gyrAngle();
   filterMPU();
 
-  Serial.print("Cx:");
-  Serial.println(CxAngle);
-  Serial.print("Cy:");
-  Serial.println(CyAngle);
+  rollERR = CxAngle;
+  pitchERR = CyAngle;
 
   pidRoll.Compute();
   pidPitch.Compute();
   pidAlt.Compute();
 
-  target = analogRead(A0);
-  if (target>2047)
-    target = 2047;
-  if (throttle<48){
-    throttle = 48;
-  }
-  if (target<=48){
-        esc.setThrottle(M1, target, 0);
-        esc.setThrottle(M2, target, 0);
-        esc.setThrottle(M3, target, 0);
-        esc.setThrottle(M4, target, 0);
-  }else{
-    if (target>throttle){
-      throttle += 5;
-        esc.setThrottle(M1, throttle, 0);
-        esc.setThrottle(M2, throttle, 0);
-        esc.setThrottle(M3, throttle, 0);
-        esc.setThrottle(M4, throttle, 0);
-    }else if (target<throttle){
-      throttle -= 5;
-        esc.setThrottle(M1, throttle, 0);
-        esc.setThrottle(M2, throttle, 0);
-        esc.setThrottle(M3, throttle, 0);
-        esc.setThrottle(M4, throttle, 0);
-    }
-  }
 
-  delay(5);
+  Serial.print("output:");
+  Serial.println(rollCON);
+  Serial.print("input:");
+  Serial.println(rollERR);
+  Serial.print("setpoint:");
+  Serial.println(rollSET);
+
+  /*
+  Serial.print("motor1:");
+  Serial.println(throttle1);
+  Serial.print("motor2:");
+  Serial.println(throttle2);
+  Serial.print("motor3:");
+  Serial.println(throttle3);
+  Serial.print("motor4:");
+  Serial.println(throttle4);
+  */
+
+  delay(50);
 }
 
 void readMPU(){
@@ -307,16 +251,16 @@ void readMPU(){
 }
 
 void accCalibration(){
-  int i = 0;
+  int count = 0;
   AxErr = 0;
   AyErr = 0;
   AzErr = 0;
-  while(i < calibrationSamples){
+  while(count < calibrationSamples){
     readMPU();
     AxErr = AxErr + Ax;
     AyErr = AyErr + Ay;
     AzErr = AzErr + Az;
-    i ++;
+    count ++;
   }
   AxErr = AxErr/calibrationSamples;
   AyErr = AyErr/calibrationSamples;
@@ -326,16 +270,16 @@ void accCalibration(){
 }
 
 void gyrCalibration(){
-  int i = 0;
+  int count = 0;
   GxErr = 0;
   GyErr = 0;
   GzErr = 0;
-  while(i < calibrationSamples){
+  while(count < calibrationSamples){
     readMPU();
     GxErr = GxErr + Gx;
     GyErr = GyErr + Gy;
     GzErr = GzErr + Gz;
-    i ++;
+    count ++;
   }
   GxErr = GxErr/calibrationSamples;
   GyErr = GyErr/calibrationSamples;
