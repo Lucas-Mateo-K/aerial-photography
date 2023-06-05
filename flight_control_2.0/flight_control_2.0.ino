@@ -282,11 +282,11 @@ void loop() {
   //Serial.println(throttle4);
 
   Serial.print("rollERR:");
-  Serial.println(rollERR);
-  //Serial.print("pitchERR:");
-  //Serial.println(pitchERR);
-  Serial.print("rollCON:");
-  Serial.println(rollCON);
+  Serial.println(GxAngle);
+  Serial.print("pitchERR:");
+  Serial.println(GyAngle);
+  //Serial.print("rollCON:");
+  //Serial.println(rollCON);
   //Serial.print("pitchCON:");
   //Serial.println(pitchCON);
   //Serial.print("AyAngle:");
