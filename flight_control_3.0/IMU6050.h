@@ -13,6 +13,21 @@
 class MPU6050{
   public:
 
+  float *AxP;
+  float *AyP;
+  float *AzP;
+  float *AzNoCorrectP;
+  float *GxP;
+  float *GyP;
+  float *GzP;
+
+  void readMPU();
+  void setupMPU();
+  void accCalibration();
+  void gyrCalibration();
+
+  private:
+
   uint8_t ACCEL_FS_SEL;
   uint8_t GYRO_FS_SEL;
 
@@ -22,14 +37,6 @@ class MPU6050{
   bool accCal = false;
   bool gyrCal = false;
 
-  float Ax;
-  float Ay;
-  float Az;
-  float AzNoCorrect;
-  float Gx;
-  float Gy;
-  float Gz;
-
   float AxErr;
   float AyErr;
   float AzErr;
@@ -37,11 +44,6 @@ class MPU6050{
   float GxErr;
   float GyErr;
   float GzErr;
-
-  void readMPU();
-  void setupMPU();
-  void accCalibration();
-  void gyrCalibration();
 
 };
 
