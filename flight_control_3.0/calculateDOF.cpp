@@ -44,10 +44,10 @@ void calculateDOF::gyrAngle(){
   GxAngle += Gx * elapsedTime;
   GyAngle += Gy * elapsedTime;
   GzAngle += Gz * elapsedTime;
-  Serial.print("GxAngle:");
-  Serial.println(GxAngle);
-  Serial.print("GyAngle:");
-  Serial.println(GyAngle);
+  //Serial.print("GxAngle:");
+  //Serial.println(GxAngle);
+  //Serial.print("GyAngle:");
+  //Serial.println(GyAngle);
 }
 
 void calculateDOF::calcDOF(){
