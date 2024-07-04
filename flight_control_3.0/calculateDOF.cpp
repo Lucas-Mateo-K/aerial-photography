@@ -29,30 +29,44 @@ float zSpeed;
 
 void calculateDOF::accAngle(){
   accTotal = sqrt(pow(Ax, 2) + pow(Ay, 2) + pow(AzNoCorrect, 2));
+  /**
   if (abs(Ay) < accTotal) {
     AxAngle = asin((float)Ay / accTotal) * (180 / PI);
   }
   if (abs(Ax) < accTotal) {
     AyAngle = -1 * (asin((float)Ax / accTotal) * (180 / PI));
   }
+  **/
+  AxAngle = atan2(Ay, AzNoCorrect) * (180 / PI);
+  AyAngle = atan2(Ax, AzNoCorrect) * (180 / PI);
+
+  Serial.print("AxAngle:");
+  Serial.println(AxAngle);
+  Serial.print("AyAngle:");
+  Serial.println(AyAngle);
+  Serial.print("accTotal:");
+  Serial.println(accTotal);
+  
 }
 
 void calculateDOF::gyrAngle(){
   previousTime = currentTime;
   currentTime = millis();
-  elapsedTime = (currentTime - previousTime) / 1000.0000;
+  elapsedTime = (currentTime - previousTime) / 1000.0;
   GxAngle += Gx * elapsedTime;
   GyAngle += Gy * elapsedTime;
   GzAngle += Gz * elapsedTime;
-  //Serial.print("GxAngle:");
-  //Serial.println(GxAngle);
-  //Serial.print("GyAngle:");
-  //Serial.println(GyAngle);
+  /**
+  Serial.print("Gz:");
+  Serial.println(Gz);
+  Serial.print("elapsedTime:");
+  Serial.println(elapsedTime);
+  Serial.print("GzAngle:");
+  Serial.println(GzAngle);
+  **/
 }
 
 void calculateDOF::calcDOF(){
-  accAngle();
-  gyrAngle();
   xAngleDrift = xAngleDrift * (1-gyrCorrection) + (AxAngle - GxAngle) * gyrCorrection;
   yAngleDrift = yAngleDrift * (1-gyrCorrection) + (AyAngle - GyAngle) * gyrCorrection;
   CxAngle = GxAngle;

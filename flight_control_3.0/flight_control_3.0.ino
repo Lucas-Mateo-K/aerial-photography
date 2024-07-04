@@ -91,14 +91,16 @@ void setup() {
   esc.setThrottle(M4, 100, 0);
   delay(1000);
 
-  void setPreviousTime();
+  calculateDOF.setPreviousTime();
 }
 
 void loop() {
   MPU6050.readMPU();
+  calculateDOF.accAngle();
+  calculateDOF.gyrAngle();
   calculateDOF.calcDOF();
 
-  getThrottel();
+  //getThrottel();
 
   if(throttle > 50){
     PID(pidRoll, roll, &rollCON, rollSET, KpRotation, KiRotation, KdRotation);
@@ -118,13 +120,27 @@ void loop() {
     resetIntegral(pidRoll);
     resetIntegral(pidPitch);
   }
-
+/**
   Serial.print("roll:");
   Serial.println(roll);
   Serial.print("pitch:");
   Serial.println(pitch);
   Serial.print("yaw:");
   Serial.println(yaw);
+
+  Serial.print("X:");
+  Serial.println(x);
+  Serial.print("Y:");
+  Serial.println(y);
+  Serial.print("Z:");
+  Serial.println(z);
+**/
+  //Serial.print("Ax:");
+  //Serial.println(Ax);
+  //Serial.print("Y:");
+  //Serial.println(y);
+  //Serial.print("Z:");
+  //Serial.println(z);
 
   //Serial.print("motor1:");
   //Serial.println(throttle1);
@@ -144,10 +160,10 @@ void loop() {
   //Serial.print("GyAngle:");
   //Serial.println(GyAngle);
 
-  esc.setThrottle(M1, throttle1, 0);
-  esc.setThrottle(M2, throttle2, 0);
-  esc.setThrottle(M3, throttle3, 0);
-  esc.setThrottle(M4, throttle4, 0);
+  //esc.setThrottle(M1, throttle1, 0);
+  //esc.setThrottle(M2, throttle2, 0);
+  //esc.setThrottle(M3, throttle3, 0);
+  //esc.setThrottle(M4, throttle4, 0);
 }
 
 
